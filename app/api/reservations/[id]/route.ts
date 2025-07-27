@@ -6,11 +6,10 @@ import { authOptions } from "@/lib/auth";
 import { updateReservationSchema } from "@/lib/validation";
 import { createApiResponse, createApiError } from "@/lib/utils";
 
-type RouteParams = { params: { id: string } };
-
-export async function GET(request: NextRequest, context: RouteParams) {
-  const { params } = context;
-
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const session = await getServerSession(authOptions);
 
