@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/login/page.tsx
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, AlertCircle } from "lucide-react";
@@ -33,12 +32,17 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect based on role
-      router.push(
-        result?.url || (email.includes("admin") ? "/dashboard" : "/reserve")
-      );
+      const session = await getSession();
+      const role = session?.user?.role;
+
+      if (role === "ADMIN") {
+        router.push("/dashboard");
+      } else {
+        router.push("/reserve");
+      }
     } catch (err) {
       setError("An unexpected error occurred");
+    } finally {
       setLoading(false);
     }
   };
