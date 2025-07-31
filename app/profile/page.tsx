@@ -6,8 +6,18 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Calendar, MapPin, Monitor, X, Clock, User } from "lucide-react";
+import {
+  Calendar,
+  MapPin,
+  Monitor,
+  X,
+  Clock,
+  User,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
+import Alert from "@/components/Alert";
+import ConfirmationModal from "@/components/ConfirmationModal";
 
 interface Reservation {
   id: string;
@@ -30,6 +40,15 @@ export default function ProfilePage() {
   const [filter, setFilter] = useState<
     "all" | "upcoming" | "past" | "cancelled"
   >("upcoming");
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<string | null>(
+    null
+  );
+  const [alert, setAlert] = useState<{
+    type: "success" | "error" | "info" | "warning";
+    message: string;
+    show: boolean;
+  } | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -45,7 +64,7 @@ export default function ProfilePage() {
     if (session) {
       fetchReservations();
     }
-  }, [session]);
+  }, [session, filter]);
 
   const fetchReservations = async () => {
     try {
@@ -72,29 +91,46 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error("Error fetching reservations:", error);
+      showAlert("error", "Failed to load reservations");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancelReservation = async (reservationId: string) => {
-    if (!confirm("Are you sure you want to cancel this reservation?")) return;
+  const handleCancelClick = (reservationId: string) => {
+    setSelectedReservation(reservationId);
+    setShowConfirmation(true);
+  };
+
+  const handleCancelReservation = async () => {
+    if (!selectedReservation) return;
 
     try {
-      const response = await fetch(`/api/reservations/${reservationId}`, {
+      const response = await fetch(`/api/reservations/${selectedReservation}`, {
         method: "DELETE",
       });
 
       if (response.ok) {
         fetchReservations(); // Refresh reservations
-        alert("Reservation cancelled successfully!");
+        showAlert("success", "Reservation cancelled successfully");
       } else {
         const error = await response.json();
-        alert(error.message || "Failed to cancel reservation");
+        showAlert("error", error.message || "Failed to cancel reservation");
       }
     } catch (error) {
-      alert("Error cancelling reservation");
+      showAlert("error", "Error cancelling reservation");
+    } finally {
+      setShowConfirmation(false);
+      setSelectedReservation(null);
     }
+  };
+
+  const showAlert = (
+    type: "success" | "error" | "info" | "warning",
+    message: string
+  ) => {
+    setAlert({ type, message, show: true });
+    setTimeout(() => setAlert(null), 3000);
   };
 
   // Filter reservations
@@ -123,6 +159,8 @@ export default function ProfilePage() {
         return "bg-red-100 text-red-800";
       case "completed":
         return "bg-gray-100 text-gray-800";
+      case "today":
+        return "bg-blue-100 text-blue-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -153,6 +191,26 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-6xl mx-auto">
+      {/* Alert */}
+      {alert?.show && (
+        <Alert
+          type={alert.type}
+          message={alert.message}
+          onClose={() => setAlert(null)}
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        onConfirm={handleCancelReservation}
+        title="Cancel Reservation"
+        message="Are you sure you want to cancel this reservation?"
+        confirmText="Cancel Reservation"
+        cancelText="Keep Reservation"
+      />
+
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center space-x-4 mb-4">
@@ -280,7 +338,7 @@ export default function ProfilePage() {
             href="/reserve"
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Make Your First Reservation
+            Make Your Reservation
           </Link>
         </div>
       ) : (
@@ -354,7 +412,7 @@ export default function ProfilePage() {
                   {reservation.status === "ACTIVE" &&
                     new Date(reservation.date) >= new Date() && (
                       <button
-                        onClick={() => handleCancelReservation(reservation.id)}
+                        onClick={() => handleCancelClick(reservation.id)}
                         className="flex items-center space-x-1 text-red-600 hover:text-red-700 transition-colors"
                       >
                         <X className="w-4 h-4" />

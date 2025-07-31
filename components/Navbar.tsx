@@ -40,7 +40,7 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`bg-white border-b sticky top-0 z-50 transition-all ${
+      className={`bg-white border-none sticky top-0 z-50 transition-all ${
         isScrolled ? "shadow-md" : "shadow-sm"
       }`}
     >

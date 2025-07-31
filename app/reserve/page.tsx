@@ -7,7 +7,10 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import SeatCard from "@/components/SeatCard";
+import ConfirmationModal from "@/components/ConfirmationModal";
+import Alert from "@/components/Alert";
 import { Calendar, Filter, Search, MapPin } from "lucide-react";
+import Loader from "@/components/Loader";
 
 interface Seat {
   id: string;
@@ -33,6 +36,13 @@ export default function ReservePage() {
   const [locationFilter, setLocationFilter] = useState("");
   const [monitorFilter, setMonitorFilter] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [alert, setAlert] = useState<{
+    type: "success" | "error" | "info" | "warning";
+    message: string;
+    show: boolean;
+  } | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -54,17 +64,24 @@ export default function ReservePage() {
       const response = await fetch(`/api/seats?date=${selectedDate}`);
       if (response.ok) {
         const data = await response.json();
-        console.log("API response:", data);
         setSeats(Array.isArray(data) ? data : data.data || []);
       }
     } catch (error) {
       console.error("Error fetching seats:", error);
+      showAlert("error", "Failed to load seats");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReserve = async (seatId: string) => {
+  const handleReserveClick = (seatId: string) => {
+    setSelectedSeat(seatId);
+    setShowConfirmation(true);
+  };
+
+  const handleReserveConfirm = async () => {
+    if (!selectedSeat) return;
+
     try {
       const response = await fetch("/api/reservations", {
         method: "POST",
@@ -72,21 +89,32 @@ export default function ReservePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          seatId,
+          seatId: selectedSeat,
           date: selectedDate,
         }),
       });
 
       if (response.ok) {
         fetchSeats(); // Refresh seats
-        alert("Seat reserved successfully!");
+        showAlert("success", "Seat reserved successfully!");
       } else {
         const error = await response.json();
-        alert(error.message || "Failed to reserve seat");
+        showAlert("error", error.message || "Failed to reserve seat");
       }
     } catch (error) {
-      alert("Error reserving seat");
+      showAlert("error", "Error reserving seat");
+    } finally {
+      setShowConfirmation(false);
+      setSelectedSeat(null);
     }
+  };
+
+  const showAlert = (
+    type: "success" | "error" | "info" | "warning",
+    message: string
+  ) => {
+    setAlert({ type, message, show: true });
+    setTimeout(() => setAlert(null), 3000);
   };
 
   // Filter seats
@@ -108,7 +136,7 @@ export default function ReservePage() {
   if (status === "loading") {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        Loading...
+        <Loader />
       </div>
     );
   }
@@ -119,6 +147,25 @@ export default function ReservePage() {
 
   return (
     <div className="max-w-7xl mx-auto">
+      {/* Alert */}
+      {alert?.show && (
+        <Alert
+          type={alert.type}
+          message={alert.message}
+          onClose={() => setAlert(null)}
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        onConfirm={handleReserveConfirm}
+        title="Confirm Reservation"
+        message="Are you sure you want to reserve this seat?"
+        confirmText="Reserve"
+      />
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -143,7 +190,7 @@ export default function ReservePage() {
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               min={new Date().toISOString().split("T")[0]}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="appearance-none w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm cursor-pointer"
               placeholder="Select a date"
             />
           </div>
@@ -161,10 +208,9 @@ export default function ReservePage() {
               id="location-filter"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className=" w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm cursor-pointer"
             >
               <option value="">All Locations</option>
-
               {locations.map((location) => (
                 <option key={location} value={location}>
                   {location}
@@ -184,7 +230,7 @@ export default function ReservePage() {
                 type="checkbox"
                 checked={monitorFilter}
                 onChange={(e) => setMonitorFilter(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
               />
               <span className="ml-2 text-sm text-gray-700">Has Monitor</span>
             </label>
@@ -201,7 +247,7 @@ export default function ReservePage() {
               placeholder="Seat number or location..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="appearance-none w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm "
             />
           </div>
         </div>
@@ -248,7 +294,7 @@ export default function ReservePage() {
             <SeatCard
               key={seat.id}
               seat={seat}
-              onReserve={handleReserve}
+              onReserve={() => handleReserveClick(seat.id)}
               canReserve={true}
             />
           ))}
