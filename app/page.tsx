@@ -1,9 +1,13 @@
 /* eslint-disable react/no-unescaped-entities */
 // app/page.tsx
+"use client";
 import Link from "next/link";
 import { Calendar, Users, Shield, Clock } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 export default function HomePage() {
+  const { data: session } = useSession();
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -16,18 +20,29 @@ export default function HomePage() {
           system. Perfect for hybrid work environments and hot-desking offices.
         </p>
         <div className="space-x-4">
-          <Link
-            href="/register"
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors inline-block"
-          >
-            Get Started
-          </Link>
-          <Link
-            href="/login"
-            className="border border-blue-600 text-blue-600 px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-50 transition-colors inline-block"
-          >
-            Sign In
-          </Link>
+          {session ? (
+            <Link
+              href="/reserve"
+              className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors inline-block"
+            >
+              Reserve a Seat
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/register"
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors inline-block"
+              >
+                Get Started
+              </Link>
+              <Link
+                href="/login"
+                className="border border-blue-600 text-blue-600 px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-50 transition-colors inline-block"
+              >
+                Sign In
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
