@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import Alert from "@/components/Alert";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import Loader from "@/components/Loader";
 
 interface Reservation {
   id: string;
@@ -180,7 +181,7 @@ export default function ProfilePage() {
   if (status === "loading") {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        Loading...
+        <Loader />
       </div>
     );
   }
@@ -413,7 +414,7 @@ export default function ProfilePage() {
                     new Date(reservation.date) >= new Date() && (
                       <button
                         onClick={() => handleCancelClick(reservation.id)}
-                        className="flex items-center space-x-1 text-red-600 hover:text-red-700 transition-colors"
+                        className="flex items-center space-x-1 text-red-600 hover:text-red-700 hover:underline cursor-pointer transition-colors"
                       >
                         <X className="w-4 h-4" />
                         <span className="text-sm">Cancel</span>

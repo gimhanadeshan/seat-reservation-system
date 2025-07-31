@@ -1,4 +1,3 @@
-// components/SeatCard.tsx
 "use client";
 
 import { useState } from "react";
@@ -21,6 +20,7 @@ interface SeatCardProps {
   onCancel?: (seatId: string) => void;
   isReserving?: boolean;
   canReserve?: boolean;
+  compact?: boolean;
 }
 
 export default function SeatCard({
@@ -29,6 +29,7 @@ export default function SeatCard({
   onCancel,
   isReserving = false,
   canReserve = true,
+  compact = false,
 }: SeatCardProps) {
   const [loading, setLoading] = useState(false);
 
@@ -52,10 +53,39 @@ export default function SeatCard({
     }
   };
 
+  if (compact) {
+    return (
+      <button
+        onClick={seat.isAvailable ? handleReserve : undefined}
+        disabled={!seat.isAvailable || loading || isReserving || !canReserve}
+        className={`
+          w-10 h-10 rounded-md flex items-center justify-center font-medium
+          transition-colors cursor-pointer m-1 relative
+          ${
+            seat.isAvailable
+              ? canReserve
+                ? "bg-green-500 hover:bg-green-600 text-white"
+                : "bg-gray-300 text-gray-600 cursor-not-allowed"
+              : "bg-red-500 text-white cursor-not-allowed"
+          }
+          ${(loading || isReserving) && "opacity-50 cursor-not-allowed"}
+        `}
+        title={`Seat ${seat.seatNumber} - ${seat.location} ${
+          seat.hasMonitor ? "(Monitor)" : ""
+        }`}
+      >
+        {seat.seatNumber}
+        {seat.hasMonitor && (
+          <div className="absolute bottom-0 right-0 w-2 h-2 bg-blue-500 rounded-full"></div>
+        )}
+      </button>
+    );
+  }
+
   return (
     <div
       className={`
-      bg-white rounded-lg border-2 p-6 transition-all duration-200 hover:shadow-lg
+      bg-white rounded-lg border-2 p-6 transition-all duration-200 hover:shadow-lg text-sm
       ${
         seat.isAvailable
           ? "border-green-200 hover:border-green-300"
@@ -63,7 +93,6 @@ export default function SeatCard({
       }
     `}
     >
-      {/* Seat Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
           <div
@@ -85,7 +114,6 @@ export default function SeatCard({
           </div>
         </div>
 
-        {/* Status Badge */}
         <span
           className={`
           px-3 py-1 rounded-full text-xs font-medium
@@ -100,7 +128,6 @@ export default function SeatCard({
         </span>
       </div>
 
-      {/* Seat Features */}
       <div className="flex items-center space-x-4 mb-4">
         {seat.hasMonitor && (
           <div className="flex items-center text-sm text-gray-600">
@@ -110,7 +137,6 @@ export default function SeatCard({
         )}
       </div>
 
-      {/* Reservation Info */}
       {!seat.isAvailable && seat.reservedBy && (
         <div className="bg-gray-50 rounded-lg p-3 mb-4">
           <div className="flex items-center text-sm text-gray-600 mb-1">
@@ -126,13 +152,12 @@ export default function SeatCard({
         </div>
       )}
 
-      {/* Action Buttons */}
       <div className="flex space-x-2">
         {seat.isAvailable && canReserve && onReserve && (
           <button
             onClick={handleReserve}
             disabled={loading || isReserving}
-            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             {loading ? "Reserving..." : "Reserve"}
           </button>

@@ -106,6 +106,9 @@ async function main() {
   const allSeats = await prisma.seat.findMany()
   
   const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
   
@@ -117,7 +120,7 @@ async function main() {
     {
       userId: allUsers[1].id, // John
       seatId: allSeats[0].id, // A1
-      date: today,
+      date: yesterday,
       startTime: '09:00',
       endTime: '17:00',
       notes: 'Working on the new project',
@@ -162,6 +165,7 @@ async function main() {
         data: reservationData,
       })
       console.log('✅ Created reservation:', `${reservation.id}`)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       console.log('⚠️ Reservation already exists or conflict')
     }

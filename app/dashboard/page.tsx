@@ -18,6 +18,7 @@ import {
   BarChart3,
   TrendingUp,
 } from "lucide-react";
+import Loader from "@/components/Loader";
 
 interface DashboardStats {
   totalSeats: number;
@@ -88,37 +89,37 @@ export default function DashboardPage() {
   }, [session]);
 
   const fetchDashboardData = async () => {
-  try {
-    setLoading(true);
-    const [statsRes, seatsRes, usersRes] = await Promise.all([
-      fetch("/api/admin/stats"),
-      fetch("/api/admin/seats"),
-      fetch("/api/admin/users"),
-    ]);
+    try {
+      setLoading(true);
+      const [statsRes, seatsRes, usersRes] = await Promise.all([
+        fetch("/api/admin/stats"),
+        fetch("/api/admin/seats"),
+        fetch("/api/admin/users"),
+      ]);
 
-    // Handle stats response
-    if (statsRes.ok) {
-      const statsData = await statsRes.json();
-      setStats(statsData.data || statsData); // Handle both wrapped and direct responses
-    }
+      // Handle stats response
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData.data || statsData); // Handle both wrapped and direct responses
+      }
 
-    // Handle seats response
-    if (seatsRes.ok) {
-      const seatsData = await seatsRes.json();
-      setSeats(Array.isArray(seatsData) ? seatsData : seatsData.data || []);
-    }
+      // Handle seats response
+      if (seatsRes.ok) {
+        const seatsData = await seatsRes.json();
+        setSeats(Array.isArray(seatsData) ? seatsData : seatsData.data || []);
+      }
 
-    // Handle users response
-    if (usersRes.ok) {
-      const usersData = await usersRes.json();
-      setUsers(Array.isArray(usersData) ? usersData : usersData.data || []);
+      // Handle users response
+      if (usersRes.ok) {
+        const usersData = await usersRes.json();
+        setUsers(Array.isArray(usersData) ? usersData : usersData.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("Error fetching dashboard data:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleDeleteSeat = async (seatId: string) => {
     if (!confirm("Are you sure you want to delete this seat?")) return;
@@ -142,7 +143,7 @@ export default function DashboardPage() {
   if (status === "loading") {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        Loading...
+        <Loader />
       </div>
     );
   }

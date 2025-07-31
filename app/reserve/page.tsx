@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
-// app/reserve/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,7 +8,7 @@ import { useRouter } from "next/navigation";
 import SeatCard from "@/components/SeatCard";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import Alert from "@/components/Alert";
-import { Calendar, Filter, Search, MapPin } from "lucide-react";
+import { Calendar, Filter, Search, MapPin, Grid, List } from "lucide-react";
 import Loader from "@/components/Loader";
 
 interface Seat {
@@ -43,8 +42,9 @@ export default function ReservePage() {
     message: string;
     show: boolean;
   } | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "map">("map");
+  const [isReserving, setIsReserving] = useState(false);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (status === "loading") return;
     if (!session) {
@@ -53,7 +53,6 @@ export default function ReservePage() {
     }
   }, [session, status, router]);
 
-  // Fetch seats
   useEffect(() => {
     fetchSeats();
   }, [selectedDate]);
@@ -82,6 +81,7 @@ export default function ReservePage() {
   const handleReserveConfirm = async () => {
     if (!selectedSeat) return;
 
+    setIsReserving(true);
     try {
       const response = await fetch("/api/reservations", {
         method: "POST",
@@ -95,7 +95,7 @@ export default function ReservePage() {
       });
 
       if (response.ok) {
-        fetchSeats(); // Refresh seats
+        await fetchSeats();
         showAlert("success", "Seat reserved successfully!");
       } else {
         const error = await response.json();
@@ -104,6 +104,7 @@ export default function ReservePage() {
     } catch (error) {
       showAlert("error", "Error reserving seat");
     } finally {
+      setIsReserving(false);
       setShowConfirmation(false);
       setSelectedSeat(null);
     }
@@ -117,7 +118,6 @@ export default function ReservePage() {
     setTimeout(() => setAlert(null), 3000);
   };
 
-  // Filter seats
   const filteredSeats = seats.filter((seat) => {
     const matchesLocation = !locationFilter || seat.location === locationFilter;
     const matchesMonitor = !monitorFilter || seat.hasMonitor;
@@ -145,9 +145,17 @@ export default function ReservePage() {
     return null;
   }
 
+  // Group seats by location for the office map view
+  const groupedByLocation = filteredSeats.reduce((acc, seat) => {
+    if (!acc[seat.location]) {
+      acc[seat.location] = [];
+    }
+    acc[seat.location].push(seat);
+    return acc;
+  }, {} as Record<string, Seat[]>);
+
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Alert */}
+    <div className="max-w-7xl mx-auto px-4 py-8">
       {alert?.show && (
         <Alert
           type={alert.type}
@@ -156,7 +164,6 @@ export default function ReservePage() {
         />
       )}
 
-      {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={showConfirmation}
         onClose={() => setShowConfirmation(false)}
@@ -166,20 +173,43 @@ export default function ReservePage() {
         confirmText="Reserve"
       />
 
-      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Reserve a Seat
-        </h1>
-        <p className="text-gray-600">
-          Choose your preferred seat for the selected date
-        </p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Reserve a Seat
+            </h1>
+            <p className="text-gray-600">
+              Choose your preferred seat for the selected date
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setViewMode("map")}
+              className={`p-2 rounded-md ${
+                viewMode === "map" ? "bg-blue-100 text-blue-600" : "bg-gray-100"
+              }`}
+              title="Map View"
+            >
+              <Grid className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-2 rounded-md ${
+                viewMode === "grid"
+                  ? "bg-blue-100 text-blue-600"
+                  : "bg-gray-100"
+              }`}
+              title="List View"
+            >
+              <List className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Date Picker */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Calendar className="w-4 h-4 inline mr-1" />
@@ -190,25 +220,19 @@ export default function ReservePage() {
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               min={new Date().toISOString().split("T")[0]}
-              className="appearance-none w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm cursor-pointer"
-              placeholder="Select a date"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
-          {/* Location Filter */}
           <div>
-            <label
-              htmlFor="location-filter"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               <MapPin className="w-4 h-4 inline mr-1" />
               Location
             </label>
             <select
-              id="location-filter"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className=" w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm cursor-pointer"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Locations</option>
               {locations.map((location) => (
@@ -219,7 +243,6 @@ export default function ReservePage() {
             </select>
           </div>
 
-          {/* Monitor Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Filter className="w-4 h-4 inline mr-1" />
@@ -230,13 +253,12 @@ export default function ReservePage() {
                 type="checkbox"
                 checked={monitorFilter}
                 onChange={(e) => setMonitorFilter(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <span className="ml-2 text-sm text-gray-700">Has Monitor</span>
             </label>
           </div>
 
-          {/* Search */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Search className="w-4 h-4 inline mr-1" />
@@ -247,13 +269,12 @@ export default function ReservePage() {
               placeholder="Seat number or location..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="appearance-none w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm "
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="text-2xl font-bold text-green-700">
@@ -275,10 +296,9 @@ export default function ReservePage() {
         </div>
       </div>
 
-      {/* Seats Grid */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <Loader />
           <p className="mt-2 text-gray-600">Loading seats...</p>
         </div>
       ) : filteredSeats.length === 0 ? (
@@ -287,19 +307,61 @@ export default function ReservePage() {
             No seats found matching your criteria.
           </p>
         </div>
+      ) : viewMode === "map" ? (
+        <div className="space-y-8">
+          {Object.entries(groupedByLocation).map(
+            ([location, locationSeats]) => (
+              <div key={location} className="bg-white p-6 rounded-lg shadow-md">
+                <h2 className="text-xl font-semibold mb-4">{location}</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                  {locationSeats.map((seat) => (
+                    <SeatCard
+                      key={seat.id}
+                      seat={seat}
+                      onReserve={handleReserveClick}
+                      canReserve={true}
+                      compact={true}
+                      isReserving={isReserving}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          )}
+
+          {/* Legend */}
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <h3 className="text-lg font-medium mb-2">Seat Status</h3>
+            <div className="flex flex-wrap gap-4">
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                <span className="text-sm">Available</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                <span className="text-sm">Reserved</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-gray-300 rounded mr-2"></div>
+                <span className="text-sm">Unavailable</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                <span className="text-sm">Has Monitor</span>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {/* Available Seats First */}
           {availableSeats.map((seat) => (
             <SeatCard
               key={seat.id}
               seat={seat}
-              onReserve={() => handleReserveClick(seat.id)}
+              onReserve={handleReserveClick}
               canReserve={true}
             />
           ))}
-
-          {/* Reserved Seats */}
           {reservedSeats.map((seat) => (
             <SeatCard key={seat.id} seat={seat} canReserve={false} />
           ))}
