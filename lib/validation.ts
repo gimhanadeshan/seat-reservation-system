@@ -69,11 +69,21 @@ export const seatQuerySchema = z.object({
 export const reservationQuerySchema = z.object({
   userId: z.string().optional(),
   seatId: z.string().optional(),
-  status: z.enum(["ACTIVE", "CANCELLED", "COMPLETED"]).optional(),
+  status: z.string()
+    .optional()
+    .transform(val => val === "" ? undefined : val)
+    .refine(
+      val =>
+        val === undefined ||
+        val === "ACTIVE" ||
+        val === "CANCELLED" ||
+        val === "COMPLETED",
+      { message: "Invalid status value" }
+    ),
   date: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-});
+}).strict();
 
 // Types
 export type RegisterInput = z.infer<typeof registerSchema>;

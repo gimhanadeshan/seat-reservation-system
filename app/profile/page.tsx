@@ -6,15 +6,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import {
-  Calendar,
-  MapPin,
-  Monitor,
-  X,
-  Clock,
-  User,
-  TriangleAlert,
-} from "lucide-react";
+import { Calendar, MapPin, Monitor, X, Clock, User } from "lucide-react";
 import Link from "next/link";
 import Alert from "@/components/Alert";
 import ConfirmationModal from "@/components/ConfirmationModal";
@@ -36,7 +28,8 @@ interface Reservation {
 export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [reservations, setReservations] = useState<Reservation[]>([]);
+
+  const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<
     "all" | "upcoming" | "past" | "cancelled"
@@ -60,35 +53,22 @@ export default function ProfilePage() {
     }
   }, [session, status, router]);
 
-  // Fetch reservations
+  // Fetch all reservations once, and refresh after changes
   useEffect(() => {
     if (session) {
       fetchReservations();
     }
-  }, [session, filter]);
+  }, [session]);
 
   const fetchReservations = async () => {
     try {
       setLoading(true);
-      let url = "/api/reservations";
-
-      // Only add status filter if needed
-      if (filter !== "all") {
-        url += `?status=${
-          filter === "upcoming"
-            ? "ACTIVE"
-            : filter === "past"
-            ? "COMPLETED"
-            : filter === "cancelled"
-            ? "CANCELLED"
-            : ""
-        }`;
-      }
-
-      const response = await fetch(url);
+      const response = await fetch("/api/reservations"); // Get all reservations
       if (response.ok) {
         const data = await response.json();
-        setReservations(data.data || data); // Handle both wrapped and direct responses
+        setAllReservations(data.data || data);
+      } else {
+        showAlert("error", "Failed to load reservations");
       }
     } catch (error) {
       console.error("Error fetching reservations:", error);
@@ -105,14 +85,13 @@ export default function ProfilePage() {
 
   const handleCancelReservation = async () => {
     if (!selectedReservation) return;
-
     try {
       const response = await fetch(`/api/reservations/${selectedReservation}`, {
         method: "DELETE",
       });
 
       if (response.ok) {
-        fetchReservations(); // Refresh reservations
+        await fetchReservations(); // Refresh all reservations after cancellation
         showAlert("success", "Reservation cancelled successfully");
       } else {
         const error = await response.json();
@@ -134,8 +113,29 @@ export default function ProfilePage() {
     setTimeout(() => setAlert(null), 3000);
   };
 
-  // Filter reservations
-  const filteredReservations = reservations.filter((reservation) => {
+  // Helper to get count per tab from allReservations
+  const getCount = (key: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return allReservations.filter((r) => {
+      const reservationDate = new Date(r.date);
+      switch (key) {
+        case "upcoming":
+          return r.status === "ACTIVE" && reservationDate >= today;
+        case "past":
+          return r.status === "COMPLETED" || reservationDate < today;
+        case "cancelled":
+          return r.status === "CANCELLED";
+        case "all":
+          return true;
+        default:
+          return true;
+      }
+    }).length;
+  };
+
+  // Filter reservations to display according to current filter
+  const filteredReservations = allReservations.filter((reservation) => {
     const reservationDate = new Date(reservation.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -147,6 +147,8 @@ export default function ProfilePage() {
         return reservation.status === "COMPLETED" || reservationDate < today;
       case "cancelled":
         return reservation.status === "CANCELLED";
+      case "all":
+        return true;
       default:
         return true;
     }
@@ -241,33 +243,25 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="text-2xl font-bold text-blue-600">
-            {
-              reservations.filter(
-                (r) => r.status === "ACTIVE" && new Date(r.date) >= new Date()
-              ).length
-            }
+            {getCount("upcoming")}
           </div>
           <div className="text-sm text-gray-600">Upcoming</div>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="text-2xl font-bold text-green-600">
-            {
-              reservations.filter(
-                (r) => r.status === "COMPLETED" || new Date(r.date) < new Date()
-              ).length
-            }
+            {getCount("past")}
           </div>
           <div className="text-sm text-gray-600">Completed</div>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="text-2xl font-bold text-red-600">
-            {reservations.filter((r) => r.status === "CANCELLED").length}
+            {getCount("cancelled")}
           </div>
           <div className="text-sm text-gray-600">Cancelled</div>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="text-2xl font-bold text-gray-600">
-            {reservations.length}
+            {allReservations.length}
           </div>
           <div className="text-sm text-gray-600">Total</div>
         </div>
@@ -295,30 +289,7 @@ export default function ProfilePage() {
                   }
                 `}
               >
-                {tab.label} (
-                {
-                  reservations.filter((r) => {
-                    const reservationDate = new Date(r.date);
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-
-                    switch (tab.key) {
-                      case "upcoming":
-                        return (
-                          r.status === "ACTIVE" && reservationDate >= today
-                        );
-                      case "past":
-                        return (
-                          r.status === "COMPLETED" || reservationDate < today
-                        );
-                      case "cancelled":
-                        return r.status === "CANCELLED";
-                      default:
-                        return true;
-                    }
-                  }).length
-                }
-                )
+                {tab.label} ({getCount(tab.key)})
               </button>
             ))}
           </nav>
@@ -403,9 +374,11 @@ export default function ProfilePage() {
                 <div className="flex items-center space-x-4">
                   <span
                     className={`
-                    px-3 py-1 rounded-full text-xs font-medium
-                    ${getStatusColor(getStatusText(reservation).toLowerCase())}
-                  `}
+                      px-3 py-1 rounded-full text-xs font-medium
+                      ${getStatusColor(
+                        getStatusText(reservation).toLowerCase()
+                      )}
+                    `}
                   >
                     {getStatusText(reservation)}
                   </span>

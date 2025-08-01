@@ -8,63 +8,62 @@ import {
   reservationQuerySchema,
 } from "@/lib/validation";
 import { createApiResponse, createApiError } from "@/lib/utils";
+import z from "zod";
+import { updateExpiredReservations } from "@/lib/reservationUtils";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    if (!session) return createApiError("Unauthorized", 401);
 
-    if (!session) {
-      return createApiError("Unauthorized", 401);
-    }
+     // Update expired reservations before querying
+    await updateExpiredReservations();
 
     const { searchParams } = new URL(request.url);
-    const query = {
+
+    // Clean query parameters - convert empty strings to undefined
+    const cleanQuery = {
       userId: searchParams.get("userId") || undefined,
       seatId: searchParams.get("seatId") || undefined,
-      status: searchParams.get("status") as
-        | "ACTIVE"
-        | "CANCELLED"
-        | "COMPLETED"
-        | undefined,
+      status: searchParams.get("status") || undefined,
       date: searchParams.get("date") || undefined,
       startDate: searchParams.get("startDate") || undefined,
       endDate: searchParams.get("endDate") || undefined,
     };
 
-    const validatedQuery = reservationQuerySchema.parse(query);
+    // Only validate if at least one parameter has a value
+    const validatedQuery: Partial<z.infer<typeof reservationQuerySchema>> =
+      Object.values(cleanQuery).some((v) => v !== undefined)
+        ? reservationQuerySchema.parse(cleanQuery)
+        : {};
 
     // Build where clause
     const where: any = {};
 
-    // If not admin, only show user's own reservations
+    // Security: Non-admins only see their own reservations
     if (session.user.role !== "ADMIN") {
       where.userId = session.user.id;
     } else if (validatedQuery.userId) {
       where.userId = validatedQuery.userId;
     }
 
-    if (validatedQuery.seatId) {
-      where.seatId = validatedQuery.seatId;
-    }
+    // Add other filters only if they exist in validatedQuery
+    if (validatedQuery.seatId) where.seatId = validatedQuery.seatId;
+    if (validatedQuery.status) where.status = validatedQuery.status;
 
-    if (validatedQuery.status) {
-      where.status = validatedQuery.status;
-    }
-
+    // Date handling
     if (validatedQuery.date) {
       where.date = new Date(validatedQuery.date);
     } else if (validatedQuery.startDate || validatedQuery.endDate) {
       where.date = {};
-      if (validatedQuery.startDate) {
+      if (validatedQuery.startDate)
         where.date.gte = new Date(validatedQuery.startDate);
-      }
-      if (validatedQuery.endDate) {
+      if (validatedQuery.endDate)
         where.date.lte = new Date(validatedQuery.endDate);
-      }
     }
 
     const reservations = await prisma.reservation.findMany({
-      where,
+      where: Object.keys(where).length > 0 ? where : undefined,
       include: {
         seat: {
           select: {
@@ -82,23 +81,27 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: {
-        date: "desc",
-      },
+      orderBy: { date: "desc" },
     });
 
     return createApiResponse(reservations);
   } catch (error: any) {
     console.error("Get reservations error:", error);
 
-    if (error.name === "ZodError") {
-      return createApiError("Invalid query parameters", 400, error.errors);
+    if (error instanceof z.ZodError) {
+      return createApiError(
+        "Invalid query parameters",
+        400,
+        error.issues.map((i) => ({
+          field: i.path.join("."),
+          message: i.message,
+        }))
+      );
     }
 
     return createApiError("Internal server error", 500);
   }
 }
-
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
